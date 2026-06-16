@@ -226,10 +226,10 @@ Caching is aggressive. Every LLM step writes its result to `cache/`, so rerunnin
 ## Citation
 
 ```bibtex
-@misc{pai2026parse,
+@misc{anonymous2026parse,
   title={PARSE: Provenance-Aware Retrieval Sanitization for
          Professional Domain LLM Agents},
-  author={Aaditya Pai},
+  author={Anonymous},
   year={2026},
   note={Under submission, EMNLP 2026 Industry Track}
 }
@@ -237,7 +237,7 @@ Caching is aggressive. Every LLM step writes its result to `cache/`, so rerunnin
 
 Related work:
 
-- Paper 1 (attack): arXiv 2605.22001
+- Paper 1 (attack): Anonymous 2026, Under submission EMNLP 2026 Research Track
 
 ## License
 
