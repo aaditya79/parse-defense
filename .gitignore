@@ -12,3 +12,11 @@ results/*.bak
 *.bbl
 *.blg
 *.out
+paper/*.pdf
+paper/*.aux
+paper/*.log
+paper/*.bbl
+paper/*.blg
+paper/*.out
+paper/*.bak
+data/*.json
