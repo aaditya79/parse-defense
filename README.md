@@ -155,8 +155,10 @@ caffeinate -i python3 experiments/eval_parse_real.py --mode full
 python3 experiments/analyze_parse.py
 
 # Run statistical tests
-python3 experiments/statistical_tests_real.py
+python3 experiments/statistical_tests_real.py --input results/real_doc_eval_trials_v2.jsonl
 ```
+
+Note: `real_doc_eval_trials_v2.jsonl` contains the corrected utility judgments (semantic LLM judge) used in the paper. The raw trial file is `real_doc_eval_trials.jsonl`.
 
 The eight evaluation conditions are: `baseline`, `paraphrasing`, `parse`, `parse_fast`, `parse_domain_conditional`, `spotlighting`, `sandwiching`, and `llamaguard`. Restrict the run with `--conditions` and `--domains`:
 
