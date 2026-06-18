@@ -1,6 +1,6 @@
 # PARSE: Provenance-Aware Retrieval Sanitization for Professional Domain LLM Agents
 
-Paper | Code | Benchmark | EMNLP 2026 Industry Track (Under Review)
+Paper | Code | Benchmark
 
 PARSE is a domain-aware, fact-preserving sanitization pipeline that defends LLM agents against domain-camouflaged prompt injection attacks on real enterprise documents.
 
@@ -230,8 +230,7 @@ Caching is aggressive. Every LLM step writes its result to `cache/`, so rerunnin
   title={PARSE: Provenance-Aware Retrieval Sanitization for
          Professional Domain LLM Agents},
   author={Anonymous},
-  year={2026},
-  note={Under submission, EMNLP 2026 Industry Track}
+  year={2026}
 }
 ```
 
