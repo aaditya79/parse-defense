@@ -20,3 +20,9 @@ paper/*.blg
 paper/*.out
 paper/*.bak
 data/*.json
+# Released benchmark artifacts (paper: GroundLM 2026 camera-ready)
+!data/real_tasks.json
+!data/real_documents.json
+!data/static_payloads.json
+!data/camouflage_payloads.json
+!data/tasks.json

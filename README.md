@@ -1,6 +1,6 @@
 # PARSE: Provenance-Aware Retrieval Sanitization for Professional Domain LLM Agents
 
-Paper | Code | Benchmark
+Paper | Code | Benchmark | GroundLM 2026 (EMNLP 2026 Workshop), archival long paper
 
 PARSE is a domain-aware, fact-preserving sanitization pipeline that defends LLM agents against domain-camouflaged prompt injection attacks on real enterprise documents.
 
@@ -10,7 +10,7 @@ Prompt injection attacks against LLM agents usually look like obvious overrides 
 
 PARSE treats sanitization as a fact-preserving rewrite rather than a detection problem. It classifies the document's domain, scores how directive the document is, then tags each sentence and scores its injection likelihood against domain-specific allowlists of legitimate directive phrasing. High-risk sentences are aggressively neutralized while every extracted fact is forced to survive into the output, which is then verified for fact coverage. The result is a sanitized document plus a provenance trace recording per-sentence injection scores and the modification applied to each sentence.
 
-On a benchmark of 122 tasks built from real enterprise documents, PARSE reaches 15.6% attack success rate (ASR) at 86.9% utility, a 38% relative ASR reduction versus the 25.4% baseline. It is the only condition tested whose ASR reduction is statistically significant (p=0.014, McNemar's exact test, one-sided, adequately powered at n=122 > n_min=103). Paraphrasing, a common lightweight defense, shows no significant improvement on real documents (p=0.500) and degrades utility from 91.8% to 82.8%.
+On a benchmark of 122 tasks built from real enterprise documents, PARSE reaches 15.6% attack success rate (ASR) at 86.9% utility, a 39% relative ASR reduction versus the 25.4% baseline and the largest effect size of any condition tested (Cohen's h = -0.245). The reduction is nominally significant (p=0.014, McNemar's exact test, one-sided) but does not survive Bonferroni correction for seven comparisons (alpha=0.0071); the only condition that does is Llama Guard 4 (p=0.004), at 64.8% utility. Paraphrasing, a common lightweight defense, shows no evidence of improvement on real documents (p=0.500) and degrades utility from 91.8% to 82.8%.
 
 ## Key Results
 
@@ -23,7 +23,7 @@ On a benchmark of 122 tasks built from real enterprise documents, PARSE reaches 
 | Llama Guard 4 | 18.9% | 64.8% |
 | **PARSE (ours)** | **15.6%** | **86.9%** |
 
-PARSE is the only condition with a statistically significant ASR reduction (p=0.014, McNemar's exact test, adequately powered). Paraphrasing shows no significant improvement (p=0.500). Llama Guard 4 lowers ASR but collapses utility to 64.8% because it blocks legitimate documents along with attacks.
+PARSE has the largest ASR reduction (h = -0.245; p=0.014 uncorrected, short of the Bonferroni threshold of 0.0071). Paraphrasing shows no evidence of improvement (p=0.500). Llama Guard 4 is the only condition that survives Bonferroni correction (p=0.004), but it collapses utility to 64.8% because it blocks legitimate documents along with attacks.
 
 ## Pipeline Architecture
 
@@ -65,7 +65,7 @@ Step 6: Output Builder
       -> per-sentence injection scores, modification log
 ```
 
-Steps 1 and 1.5 run in parallel. The directiveness gate routes low-directiveness documents to a single lightweight paraphrase, which keeps cost and latency down on the majority of documents that carry no directive content. Documents that clear the gate run the full tag, extract, rewrite, verify path. High-risk thresholds are domain-aware: financial documents use a lower bar (0.5) and general documents a higher one (0.75), reflecting how much legitimate directive language each domain normally contains.
+Steps 1 and 1.5 run in parallel. The directiveness gate routes low-directiveness documents to a single lightweight paraphrase, which keeps cost and latency down on the majority of documents that carry no directive content. Documents that clear the gate run the full tag, extract, rewrite, verify path. The gate threshold (0.5) and the rewrite bands (aggressive at injection score >= 0.6, light at 0.3-0.6, verbatim below 0.3) were set a priori and are not tuned; there is no validation split or calibration data in this repository.
 
 ## Benchmark
 
@@ -226,17 +226,20 @@ Caching is aggressive. Every LLM step writes its result to `cache/`, so rerunnin
 ## Citation
 
 ```bibtex
-@misc{anonymous2026parse,
+@inproceedings{pai-2026-parse,
   title={PARSE: Provenance-Aware Retrieval Sanitization for
          Professional Domain LLM Agents},
-  author={Anonymous},
+  author={Pai, Aaditya},
+  booktitle={Proceedings of the 1st Workshop on Grounding Language Models:
+             Learning Faithfully and Efficiently (GroundLM 2026)},
   year={2026}
 }
 ```
 
 Related work:
 
-- Paper 1 (attack): Anonymous 2026, Under submission EMNLP 2026 Research Track
+- Paper 1 (attack): Pai 2026, arXiv:2605.22001
+- Paper 2 (prompting-based defenses): Pai 2026, arXiv:2606.18530
 
 ## License
 
