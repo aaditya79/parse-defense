@@ -1,6 +1,6 @@
 # PARSE: Provenance-Aware Retrieval Sanitization for Professional Domain LLM Agents
 
-Paper | Code | Benchmark | GroundLM 2026 (EMNLP 2026 Workshop), archival long paper
+[Paper (arXiv:2606.17467)](https://arxiv.org/abs/2606.17467) | Code | [Benchmark](data/README.md) | GroundLM 2026 (EMNLP 2026 Workshop), archival long paper
 
 PARSE is a domain-aware, fact-preserving sanitization pipeline that defends LLM agents against domain-camouflaged prompt injection attacks on real enterprise documents.
 
@@ -8,7 +8,7 @@ PARSE is a domain-aware, fact-preserving sanitization pipeline that defends LLM 
 
 Prompt injection attacks against LLM agents usually look like obvious overrides ("ignore all previous instructions"). Domain-camouflaged injection is harder. The malicious payload is written in the native register of the surrounding document, so a financial injection reads like a sell-side recommendation, a legal injection reads like a contractual obligation, and a medical injection reads like a clinical guideline. Generic defenses struggle here because the line between a legitimate domain directive and an injected one is semantic, not lexical. A filter that flags imperative or authoritative language flags the real document along with the attack.
 
-PARSE treats sanitization as a fact-preserving rewrite rather than a detection problem. It classifies the document's domain, scores how directive the document is, then tags each sentence and scores its injection likelihood against domain-specific allowlists of legitimate directive phrasing. High-risk sentences are aggressively neutralized while every extracted fact is forced to survive into the output, which is then verified for fact coverage. The result is a sanitized document plus a provenance trace recording per-sentence injection scores and the modification applied to each sentence.
+PARSE treats sanitization as a fact-preserving rewrite rather than a detection problem. It classifies the document's domain, scores how directive the document is, then tags each sentence and scores its injection likelihood conditioned on the document's domain, with a small domain-specific allowlist of legitimate authority phrasing applied in post-processing. High-risk sentences are aggressively neutralized while every extracted fact is forced to survive into the output, which is then verified for fact coverage. The result is a sanitized document plus a provenance trace recording per-sentence injection scores and the modification applied to each sentence.
 
 On a benchmark of 122 tasks built from real enterprise documents, PARSE reaches 15.6% attack success rate (ASR) at 86.9% utility, a 39% relative ASR reduction versus the 25.4% baseline and the largest effect size of any condition tested (Cohen's h = -0.245). The reduction is nominally significant (p=0.014, McNemar's exact test, one-sided) but does not survive Bonferroni correction for seven comparisons (alpha=0.0071); the only condition that does is Llama Guard 4 (p=0.004), at 64.8% utility. Paraphrasing, a common lightweight defense, shows no evidence of improvement on real documents (p=0.500) and degrades utility from 91.8% to 82.8%.
 
@@ -44,7 +44,8 @@ Step 1.5: Directiveness Gate (Haiku)
       v
 Steps 2+3: Combined Tagger-Extractor (Haiku)
       -> labels each sentence: factual | directive | hybrid
-      -> scores injection likelihood 0-1 with domain allowlists
+      -> scores injection likelihood 0-1, conditioned on the domain
+         (allowlist post-processing caps matched sentences at 0.3)
       -> extracts a structured fact list
       |
       v
@@ -75,13 +76,13 @@ Real-Document Benchmark: 122 tasks across 5 professional domains.
 |---|---|---|---|
 | Financial | 24 | SEC EDGAR | 10-K MD&A sections |
 | Legal | 25 | Federal Register | Final rules and regulatory notices |
-| Medical | 23 | PubMed | RCT and systematic review abstracts |
+| Medical | 23 | PubMed | RCT abstracts |
 | Scientific | 25 | arXiv cs.AI/LG/CL | ML/AI research abstracts |
-| DevOps | 25 | GitHub danluu/post-mortems | Incident reports |
+| DevOps | 25 | GitHub danluu/post-mortems | Incident summaries (README excerpts; see `data/README.md`) |
 
 Each task contains:
 
-- A real enterprise document (150-500 words)
+- A real enterprise document (150-500 words; sources are truncated to 500 words)
 - A legitimate analysis task
 - A malicious goal
 - A domain-camouflaged payload
@@ -101,7 +102,7 @@ parse-defense/
 │   ├── consistency_checker.py       # Step 5: fact verification
 │   ├── output_builder.py            # Step 6: provenance trace
 │   ├── pipeline.py                  # Full PARSE orchestration
-│   ├── pipeline_fast.py             # Ablation: 2-step variant
+│   ├── pipeline_fast.py             # Ablation: single combined analysis call (parse_fast)
 │   ├── sentence_tagger.py           # Standalone tagger + domain allowlists
 │   ├── fact_extractor.py            # Standalone fact extractor
 │   └── _utils.py                    # JSON retry, caching utilities
@@ -113,6 +114,13 @@ parse-defense/
 ├── scripts/
 │   ├── build_real_corpus.py         # Collect real documents from APIs
 │   └── construct_tasks.py           # Generate injection tasks
+├── data/
+│   ├── README.md                    # File roles and per-domain provenance
+│   ├── real_documents.json          # 125 real source documents
+│   ├── real_tasks.json              # The 122 evaluated tasks (paper benchmark)
+│   ├── tasks.json                   # Earlier synthetic task set (200 tasks)
+│   ├── camouflage_payloads.json     # Synthetic-set payload variants
+│   └── static_payloads.json         # 20 static injection templates
 ├── config.py                        # Model and threshold configuration
 └── requirements.txt
 ```
@@ -141,24 +149,22 @@ The `.env` file is read at import time by `config.py`. Do not commit it.
 
 ### Reproduce main results (real-document benchmark)
 
-```bash
-# Collect real documents (free, public APIs)
-python3 scripts/build_real_corpus.py
+The benchmark evaluated in the paper ships in `data/real_tasks.json` and `data/real_documents.json`, so the two construction steps below are only needed to build a *new* corpus; rerunning them regenerates tasks with an unpinned model and will not reproduce the released benchmark.
 
-# Construct injection tasks (~$1.20, uses claude-sonnet-4-5)
+```bash
+# (Optional) Collect real documents (free, public APIs) and construct new tasks (~$1.20, uses claude-sonnet-4-5)
+python3 scripts/build_real_corpus.py
 python3 scripts/construct_tasks.py
 
-# Run full evaluation: all 8 conditions, 122 tasks (~$5-6)
+# Run full evaluation on the released benchmark: all 8 conditions, 122 tasks (~$5-6)
+# Prints the per-domain ASR / utility table at the end and writes results/real_doc_eval_trials.jsonl
 caffeinate -i python3 experiments/eval_parse_real.py --mode full
 
-# Generate results tables
-python3 experiments/analyze_parse.py
-
-# Run statistical tests
-python3 experiments/statistical_tests_real.py --input results/real_doc_eval_trials_v2.jsonl
+# Run statistical tests (McNemar's exact, Cohen's h, power) on your evaluation output
+python3 experiments/statistical_tests_real.py --input results/real_doc_eval_trials.jsonl
 ```
 
-Note: `real_doc_eval_trials_v2.jsonl` contains the corrected utility judgments (semantic LLM judge) used in the paper. The raw trial file is `real_doc_eval_trials.jsonl`.
+Per-trial agent outputs and judge decisions from the paper's run were not retained and are not included; the paper's numbers come from the same pipeline applied to the released benchmark, with utility judged by the semantic LLM judge in `eval_parse_real.py`. `experiments/analyze_parse.py` reads the synthetic-benchmark trial file written by `experiments/eval_parse.py`, not the real-document file.
 
 The eight evaluation conditions are: `baseline`, `paraphrasing`, `parse`, `parse_fast`, `parse_domain_conditional`, `spotlighting`, `sandwiching`, and `llamaguard`. Restrict the run with `--conditions` and `--domains`:
 
@@ -210,7 +216,7 @@ Key settings in `config.py`:
 | HIGH_RISK_THRESHOLD | 0.6 | Aggressive neutralization threshold |
 | LIGHT_REWRITE_THRESHOLD | 0.3 | Light rewrite threshold |
 
-The directiveness gate routes a document to the full pipeline when its directiveness score is at least 0.5, and to a single lightweight paraphrase otherwise (set in `pipeline.py`). All models are accessed through OpenRouter. The paraphraser defaults to `claude-sonnet-4-5` for best results; set every step to Haiku for faster, cheaper experimentation.
+The directiveness gate routes a document to the full pipeline when its directiveness score is at least 0.5, and to a single lightweight paraphrase otherwise (`directiveness_classifier.py`; applied in `pipeline.py`). All models are accessed through OpenRouter. The paraphraser defaults to `claude-sonnet-4-5` for best results; set every step to Haiku for faster, cheaper experimentation.
 
 ## Cost Estimates
 
@@ -218,29 +224,34 @@ The directiveness gate routes a document to the full pipeline when its directive
 |---|---|---|
 | Document collection | 125 docs | Free |
 | Task construction | 122 tasks | ~$1.20 |
-| Full evaluation (8 conditions) | 610 trials | ~$5-6 |
+| Full evaluation (8 conditions) | 976 trials (8 x 122) | ~$5-6 |
 | PARSE on a single document | 1 doc | ~$0.01 |
 
 Caching is aggressive. Every LLM step writes its result to `cache/`, so rerunning skips completed steps automatically. Document collection uses free public APIs (SEC EDGAR, Federal Register, PubMed, arXiv, GitHub).
 
 ## Citation
 
+Pai, A. (2026). PARSE: Provenance-Aware Retrieval Sanitization for Professional Domain LLM Agents. In *Proceedings of the 1st Workshop on Grounding Language Models: Learning Faithfully and Efficiently (GroundLM 2026)*, EMNLP 2026. arXiv:2606.17467. https://arxiv.org/abs/2606.17467
+
 ```bibtex
 @inproceedings{pai-2026-parse,
-  title={PARSE: Provenance-Aware Retrieval Sanitization for
-         Professional Domain LLM Agents},
-  author={Pai, Aaditya},
-  booktitle={Proceedings of the 1st Workshop on Grounding Language Models:
-             Learning Faithfully and Efficiently (GroundLM 2026)},
-  year={2026}
+  title     = {{PARSE}: Provenance-Aware Retrieval Sanitization for
+               Professional Domain {LLM} Agents},
+  author    = {Pai, Aaditya},
+  booktitle = {Proceedings of the 1st Workshop on Grounding Language Models:
+               Learning Faithfully and Efficiently (GroundLM 2026)},
+  publisher = {Association for Computational Linguistics},
+  year      = {2026},
+  note      = {EMNLP 2026 workshop. arXiv:2606.17467},
+  url       = {https://arxiv.org/abs/2606.17467}
 }
 ```
 
 Related work:
 
-- Paper 1 (attack): Pai 2026, arXiv:2605.22001
-- Paper 2 (prompting-based defenses): Pai 2026, arXiv:2606.18530
+- Pai, A. (2026). Blind Spots in the Guard: How Domain-Camouflaged Injection Attacks Evade Detection in Multi-Agent LLM Systems. arXiv:2605.22001. https://arxiv.org/abs/2605.22001
+- Pai, A. (2026). Evaluating Prompting-Based Defenses Against Domain-Camouflaged Injection Attacks. COLM 2026, AdvML-Frontiers x CoTMA Workshop (non-archival). arXiv:2606.18530. https://arxiv.org/abs/2606.18530
 
 ## License
 
-MIT
+The code is released under the MIT License (see `LICENSE`). The benchmark data in `data/` is redistributed from public sources; its provenance and terms are described in `data/README.md`.
